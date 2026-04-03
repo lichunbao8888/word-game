@@ -191,7 +191,20 @@
     }
     
     function save() {
-        localStorage.setItem('dancixia_users', JSON.stringify(users));
+        // 保存到服务器
+        for (var userId in users) {
+            fetch('/api/users', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    user_id: userId,
+                    level: users[userId].level,
+                    correct: users[userId].correct,
+                    wrong: users[userId].wrong,
+                    wrongWords: users[userId].wrongWords
+                })
+            });
+        }
     }
     
     function showScreen(id) {
@@ -217,12 +230,36 @@
         var p = document.getElementById('reg_password').value.trim();
         if (!phone || !u || !p) { alert('请输入手机号、用户名和密码'); return; }
         if (!/^1[3-9]\d{9}$/.test(phone)) { alert('请输入有效的手机号'); return; }
-        if (users[phone]) { alert('该手机号已注册'); return; }
-        if (users[u]) { alert('用户名已存在'); return; }
-        users[phone] = {pw:p, username:u, level:1, question:0, correct:0, wrong:0, wrongWords:[]};
-        save();
-        user = phone;
-        showMenu();
+        
+        // 检查是否已注册
+        fetch('/api/users?user_id=' + phone)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    // 未注册，创建新用户
+                    fetch('/api/users', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            user_id: phone,
+                            username: u,
+                            password: p
+                        })
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            users[phone] = data.user;
+                            user = phone;
+                            showMenu();
+                        }
+                    });
+                } else {
+                    alert('该手机号已注册');
+                }
+            });
     }
     
     function showMenu() {

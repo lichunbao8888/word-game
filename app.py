@@ -7,15 +7,33 @@
 import os
 import json
 import pandas as pd
-from flask import Flask, send_from_directory, jsonify, request
+from flask import Flask, send_file, jsonify, request
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__)
 CORS(app)
 
-# 词库文件
+# 文件路径
 WORD_FILE = '单词虾词库模版.xlsx'
+USER_FILE = 'users.json'
 
+# ==================== 用户数据管理 ====================
+def load_users():
+    """加载用户数据"""
+    if os.path.exists(USER_FILE):
+        try:
+            with open(USER_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_users(users):
+    """保存用户数据"""
+    with open(USER_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+# ==================== 词库管理 ====================
 def load_words():
     """从Excel加载词库"""
     try:
@@ -43,21 +61,67 @@ def load_words():
         print(f"词库加载失败: {e}")
         return []
 
-# API: 获取词库
+# ==================== API ====================
 @app.route('/api/words')
 def get_words():
     words = load_words()
     return jsonify(words)
 
+@app.route('/api/users', methods=['GET', 'POST', 'PUT'])
+def api_users():
+    users = load_users()
+    
+    if request.method == 'GET':
+        # 获取用户数据
+        user_id = request.args.get('user_id')
+        if user_id and user_id in users:
+            return jsonify(users[user_id])
+        return jsonify(users)
+    
+    elif request.method == 'POST':
+        # 注册新用户
+        data = request.json
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({'error': '缺少user_id'}), 400
+        if user_id in users:
+            return jsonify({'error': '用户已存在'}), 400
+        
+        users[user_id] = {
+            'pw': data.get('password', ''),
+            'username': data.get('username', ''),
+            'level': 1,
+            'correct': 0,
+            'wrong': 0,
+            'wrongWords': []
+        }
+        save_users(users)
+        return jsonify({'success': True, 'user': users[user_id]})
+    
+    elif request.method == 'PUT':
+        # 更新用户数据
+        data = request.json
+        user_id = data.get('user_id')
+        if not user_id or user_id not in users:
+            return jsonify({'error': '用户不存在'}), 400
+        
+        # 更新字段
+        for key in ['level', 'correct', 'wrong', 'wrongWords']:
+            if key in data:
+                users[user_id][key] = data[key]
+        
+        save_users(users)
+        return jsonify({'success': True})
+
 # 首页
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    return send_file('index.html')
 
-# 其他静态文件
-@app.route('/<path:path>')
-def static_files(path):
-    return send_from_directory('.', path)
+# 词库文件
+@app.route('/单词虾词库模版.xlsx')
+def word_file():
+    return send_file(WORD_FILE)
 
 if __name__ == '__main__':
     words = load_words()
