@@ -371,9 +371,7 @@ else:
                         'correct': False,
                         'correct_answer': ' / '.join(correct_pos)
                     }
-                    # 错题不进入下一题，继续当前题
-                    st.session_state.selected_options = []，继续当前题
-                    st.session_state.selected_options = []  # 重置选项
+                    st.session_state.selected_options = []
                 st.rerun()
         
         else:
