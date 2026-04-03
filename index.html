@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>单词虾记忆闯关</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {margin:0;padding:0;box-sizing:border-box}
+        body {font-family:'Microsoft YaHei',Arial,sans-serif;background:#f0f0f0;padding:20px}
+        html,body {height:100%;overflow:hidden}
+        h1 {color:#4A90D9;text-align:center;margin-bottom:20px}
+        .container {max-width:100%;max-height:100%;margin:0 auto;background:white;border-radius:10px;padding:30px;box-shadow:0 2px 10px rgba(0,0,0,0.1);height:100vh;display:flex;flex-direction:column}
+        .screen {display:none;flex:1}
+        .screen.active {display:flex;flex-direction:column}
+        input {padding:12px;font-size:18px;border:2px solid #ddd;border-radius:5px;width:100%;margin:5px 0}
+        input:focus {outline:none;border-color:#4A90D9}
+        button {padding:12px 30px;font-size:16px;background:#4A90D9;color:white;border:none;border-radius:5px;cursor:pointer;margin:5px}
+        button:hover {background:#357ABD}
+        button.green {background:#5CB85C}
+        button.green:hover {background:#4CAE4C}
+        button.red {background:#D9534F}
+        button.red:hover {background:#C9302C}
+        .level-btn {padding:15px 25px;font-size:18px;display:block;width:100%;margin:5px 0}
+        .option-box {display:block;width:100%;padding:15px;margin:5px 0;background:white;border:2px solid #ddd;border-radius:5px;text-align:left;font-size:16px;cursor:pointer}
+        .option-box:hover {border-color:#4A90D9;background:#f9f9f9}
+        .option-box.selected {background:#FFFACD;border-color:#FFA500}
+        .top-bar {background:#4A90D9;color:white;padding:15px;display:flex;justify-content:space-between;border-radius:5px;margin-bottom:20px}
+        .word-area {position:relative;height:300px;background:#fff;border:2px solid #ccc;border-radius:10px;margin:20px 0;overflow:hidden;flex:1}
+        .floating-word {position:absolute;font-size:80px;font-weight:bold;color:#e74c3c;transition:all 0.3s;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}
+        .hint {text-align:center;color:#666;font-size:14px;margin:10px 0}
+        .stats {text-align:center;margin:20px 0;color:#666}
+        .message {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px;border-radius:10px;box-shadow:0 5px 30px rgba(0,0,0,0.3);z-index:100;text-align:center;display:none}
+        .message.show {display:block}
+        .input-area {margin:20px 0}
+        .input-area input {font-size:24px;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align:right;margin-bottom:10px">
+            <button onclick="toggleFullScreen()" style="padding:8px 15px;font-size:14px">全屏</button>
+        </div>
+        <h1>单词虾记忆闯关</h1>
+        
+        <div id="login" class="screen active">
+            <input id="username" placeholder="手机号"><br>
+            <input id="password" type="password" placeholder="密码"><br>
+            <div style="text-align:center;margin:20px 0">
+                <button onclick="login()">登录</button>
+                <button class="green" onclick="showRegister()">注册</button>
+            </div>
+        </div>
+        
+        <div id="register" class="screen">
+            <input id="reg_phone" placeholder="手机号" maxlength="11"><br>
+            <input id="reg_username" placeholder="用户名"><br>
+            <input id="reg_password" type="password" placeholder="密码"><br>
+            <div style="text-align:center;margin:20px 0">
+                <button class="green" onclick="doRegister()">注册</button>
+                <button onclick="showLogin()">返回</button>
+            </div>
+        </div>
+        
+        <div id="menu" class="screen">
+            <h2 style="text-align:center;margin:20px 0">欢迎, <span id="welcome_name"></span></h2>
+            <div>
+                <button class="level-btn" onclick="startLevel(1)">关卡1: 单词性·释义单选</button>
+                <button class="level-btn" onclick="startLevel(2)">关卡2: 双词性·释义单选</button>
+                <button class="level-btn" onclick="startLevel(3)">关卡3: 三词性·释义单选</button>
+                <button class="level-btn" onclick="startLevel(4)">关卡4: 多词性·释义单选</button>
+                <button class="level-btn" onclick="startLevel(5)">关卡5: 词性多选</button>
+                <button class="level-btn" onclick="startLevel(6)">关卡6: 听音写词</button>
+            </div>
+            <p class="stats">总答题: <span id="total">0</span> | 正确: <span id="correct">0</span> | 错误: <span id="wrong">0</span></p>
+            <div style="text-align:center">
+                <button onclick="showUpload()">📚 词库管理</button>
+                <button class="red" onclick="logout()">退出登录</button>
+            </div>
+        </div>
+        
+        <div id="game" class="screen">
+            <div class="top-bar">
+                <span id="level_display">关卡1</span>
+                <span id="player_display">玩家:</span>
+                <span id="question_display">第1题</span>
+            </div>
+            
+            <div class="word-area" id="word_area">
+                <div class="floating-word" id="floating_word"></div>
+            </div>
+            
+            <div id="options_area"></div>
+            
+            <div class="input-area" id="input_area" style="display:none">
+                <input type="text" id="word_input" placeholder="请输入听到的单词">
+                <p class="hint">按回车确认</p>
+            </div>
+            
+            <p class="hint" id="hint_text">按数字键选择正确答案</p>
+        </div>
+    </div>
+    
+    <div id="message" class="message">
+        <p id="message_text" style="margin-bottom:15px"></p>
+        <button onclick="closeMessage()">确定</button>
+    </div>
+    
+    <!-- 词库管理弹窗 -->
+    <div id="upload_modal" class="message">
+        <h3 style="margin-bottom:15px">📚 词库管理</h3>
+        <p style="margin-bottom:10px">当前词库: <span id="word_count">0</span> 个单词</p>
+        <p style="font-size:14px;color:#666;margin-bottom:15px">在Excel中添加单词后，点击刷新按钮</p>
+        <div style="margin:15px 0">
+            <input type="file" id="excel_file" accept=".xlsx,.xls" style="margin-bottom:10px">
+            <button onclick="uploadExcel()">📤 导入Excel词库</button>
+        </div>
+        <button onclick="refreshWords()">🔄 刷新词库</button>
+        <button onclick="closeUpload()">关闭</button>
+    </div>
+    
+    <!-- 下载模板 -->
+    <div id="download_modal" class="message">
+        <h3 style="margin-bottom:15px">下载词库模板</h3>
+        <p style="margin-bottom:10px">下载Excel模板，添加单词后导入</p>
+        <button onclick="downloadTemplate()">📥 下载模板</button>
+        <button onclick="closeDownload()">关闭</button>
+    </div>
+
+    <script>
+    var wordData = [];
+    var currentLevel = 1;
+    var currentQuestion = 0;
+    var currentWord = null;
+    var options = [];
+    var selectedOptions = [];
+    var user = null;
+    var users = {};
+    var audioCtx = null;
+    var levelWords = [];
+    
+    // 从Excel读取的词库
+    var rawWords = [
+        {w:"foreign",p:"形容词",m:"外国的；涉外的，外来的；异国的，陌生的；不相关的"},
+        {w:"countryside",p:"名词",m:"乡村；农村；郊外,乡下的全体居民"},
+        {w:"animal",p:"名词/形容词",m:"动物，兽类；牲畜//肉体的；动物性的"},
+        {w:"mud",p:"名词",m:"泥；泥浆；烂泥，污物；污垢"},
+        {w:"spoon",p:"名词/动词",m:"勺；匙；勺子,一匙的量//用勺舀；用匙盛"},
+        {w:"fork",p:"名词/动词",m:"餐叉；叉子,（道路、河流等的）分岔处；岔口//分岔；岔开；用叉叉起"},
+        {w:"horse",p:"名词",m:"马,骑兵"},
+        {w:"cow",p:"名词",m:"奶牛；母牛,肉牛；菜牛"},
+        {w:"yard",p:"名词",m:"院子；庭院|码（长度单位，1 码 ≈ 0.9144 米）|场地；工场"},
+        {w:"cook",p:"名词/动词",m:"厨师；炊事员//烹饪；煮；烧；做饭|密谋；策划"},
+        {w:"fetch",p:"动词",m:"（去）拿来；（去）取来|接来；请来|售得；卖得"},
+        {w:"clean",p:"形容词/动词/副词",m:"干净的；洁净的|无污染的；文明的//打扫；清洁；擦干净//完全地；彻底地"},
+        {w:"movie",p:"名词",m:"电影|电影院（常用复数 movies）"},
+        {w:"Avengers",p:"名词",m:"复仇者；报仇者|（漫威）复仇者联盟"},
+        {w:"marvel",p:"名词/动词",m:"奇迹；令人惊奇的人（或事物）|漫威（知名漫画 / 影视公司）//惊叹；感到惊奇"},
+        {w:"bombastic",p:"形容词",m:"浮夸的；夸夸其谈的；言过其实的|空洞高调的"},
+        {w:"chew",p:"动词/名词",m:"咀嚼；嚼碎|细想；深思（常与 over 连用）//咀嚼；一口嚼的量"},
+        {w:"gum",p:"名词/动词",m:"口香糖；泡泡糖|牙龈；齿龈|树胶；胶水//用胶粘；粘合"},
+        {w:"broom",p:"名词",m:"扫帚；扫把|金雀花（一种植物）"},
+        {w:"sweep",p:"动词/名词",m:"扫；打扫；清扫|掠过；席卷；横扫//打扫；清扫；扫掠"},
+        {w:"printer",p:"名词",m:"打印机，印刷机"},
+        {w:"speaker",p:"名词",m:"扬声器，音箱；说话者，发言人"},
+        {w:"character",p:"名词",m:"性格，品质|角色，人物|文字，字符|特性，特征"},
+        {w:"picture",p:"名词/动词",m:"照片；图画；图片；画面//想象；描绘"},
+        {w:"above",p:"副词/形容词/介词",m:"在上方；上述//上述的//在…… 上面"}
+    ];
+    
+    // 自动从服务器加载词库
+    function loadWordsFromAPI(callback) {
+        fetch('/api/words')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                rawWords = data;
+                console.log('词库加载完成: ' + data.length + '个单词');
+                if (callback) callback();
+            })
+            .catch(function(err) {
+                console.error('词库加载失败:', err);
+                alert('词库加载失败，请刷新页面重试');
+            });
+    }
+    
+    var wordData = [];
+    
+    function init() {
+        wordData = rawWords;
+        var s = localStorage.getItem('dancixia_users');
+        users = s ? JSON.parse(s) : {};
+    }
+    
+    function save() {
+        localStorage.setItem('dancixia_users', JSON.stringify(users));
+    }
+    
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+        document.getElementById(id).classList.add('active');
+    }
+    
+    function login() {
+        var u = document.getElementById('username').value.trim();
+        var p = document.getElementById('password').value.trim();
+        if (!u || !p) { alert('请输入手机号和密码'); return; }
+        if (!users[u] || users[u].pw !== p) { alert('手机号或密码错误'); return; }
+        user = u;
+        showMenu();
+    }
+    
+    function showRegister() { showScreen('register'); }
+    function showLogin() { showScreen('login'); }
+    
+    function doRegister() {
+        var phone = document.getElementById('reg_phone').value.trim();
+        var u = document.getElementById('reg_username').value.trim();
+        var p = document.getElementById('reg_password').value.trim();
+        if (!phone || !u || !p) { alert('请输入手机号、用户名和密码'); return; }
+        if (!/^1[3-9]\d{9}$/.test(phone)) { alert('请输入有效的手机号'); return; }
+        if (users[phone]) { alert('该手机号已注册'); return; }
+        if (users[u]) { alert('用户名已存在'); return; }
+        users[phone] = {pw:p, username:u, level:1, question:0, correct:0, wrong:0, wrongWords:[]};
+        save();
+        user = phone;
+        showMenu();
+    }
+    
+    function showMenu() {
+        var userData = users[user];
+        document.getElementById('welcome_name').textContent = userData.username || user;
+        var d = users[user];
+        document.getElementById('total').textContent = d.correct + d.wrong;
+        document.getElementById('correct').textContent = d.correct;
+        document.getElementById('wrong').textContent = d.wrong;
+        showScreen('menu');
+    }
+    
+    function logout() {
+        user = null;
+        showScreen('login');
+    }
+    
+    function shuffle(array) {
+        for (var i = array.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = array[i]; array[i] = array[j]; array[j] = t;
+        }
+        return array;
+    }
+    
+    function startLevel(lvl) {
+        var d = users[user];
+        if (lvl > 1 && d.level < lvl - 1) { alert('请先通关前一关'); return; }
+        if (lvl === 6 && d.level < 5) { alert('请先通关关卡5'); return; }
+        
+        currentLevel = lvl;
+        currentQuestion = 0;
+        
+        // 获取当前关卡单词
+        var lvlWords = getLevelWords(lvl);
+        
+        if (lvlWords.length === 0) {
+            alert('该关卡暂无可用单词');
+            return;
+        }
+        
+        // 错题优先出现
+        var wrongWords = d.wrongWords || [];
+        if (wrongWords.length > 0) {
+            // 分离错题和正常题
+            var wrongList = lvlWords.filter(function(w) { return wrongWords.indexOf(w.w) >= 0; });
+            var normalList = lvlWords.filter(function(w) { return wrongWords.indexOf(w.w) < 0; });
+            // 错题打乱后放前面
+            shuffle(wrongList);
+            shuffle(normalList);
+            levelWords = wrongList.concat(normalList);
+        } else {
+            shuffle(lvlWords);
+            levelWords = lvlWords;
+        }
+        
+        loadQuestion();
+        showScreen('game');
+    }
+    
+    function getLevelWords(lvl) {
+        if (lvl === 6) return wordData.slice();
+        
+        return wordData.filter(function(w) {
+            var posList = w.p.split('/').filter(function(p) { return p.trim(); });
+            var len = posList.length;
+            if (lvl === 1) return len === 1;
+            if (lvl === 2) return len === 2;
+            if (lvl === 3) return len === 3;
+            if (lvl === 4) return len >= 4;
+            return len >= 2;
+        });
+    }
+    
+    function loadQuestion() {
+        if (currentQuestion >= levelWords.length) {
+            var d = users[user];
+            if (d.level < currentLevel) { d.level = currentLevel + 1; save(); }
+            alert('恭喜通关第' + currentLevel + '关！');
+            showMenu();
+            return;
+        }
+        
+        currentWord = levelWords[currentQuestion];
+        selectedOptions = [];
+        
+        document.getElementById('level_display').textContent = '关卡' + currentLevel;
+        document.getElementById('player_display').textContent = '玩家:' + user;
+        document.getElementById('question_display').textContent = '第' + (currentQuestion + 1) + '题';
+        
+        var wordEl = document.getElementById('floating_word');
+        if (currentLevel === 6) {
+            wordEl.textContent = '';
+            wordEl.style.opacity = '0';
+        } else {
+            wordEl.textContent = currentWord.w;
+            wordEl.style.opacity = '1';
+        }
+        
+        var area = document.getElementById('word_area');
+        wordEl.style.left = Math.random() * (area.clientWidth - 150) + 'px';
+        wordEl.style.top = Math.random() * (area.clientHeight - 80) + 'px';
+        
+        generateOptions();
+        speakWord(currentWord.w);
+        
+        if (currentLevel === 6) {
+            document.getElementById('options_area').style.display = 'none';
+            document.getElementById('input_area').style.display = 'block';
+            document.getElementById('word_input').value = '';
+            document.getElementById('word_input').focus();
+        } else {
+            document.getElementById('options_area').style.display = 'block';
+            document.getElementById('input_area').style.display = 'none';
+            document.getElementById('hint_text').textContent = currentLevel < 5 ? '按数字键或点击选择正确答案' : '点击选择所有正确词性，再点击确认';
+        }
+    }
+    
+    function generateOptions() {
+        var optsArea = document.getElementById('options_area');
+        optsArea.innerHTML = '';
+        
+        if (currentLevel < 5) {
+            // 释义选项 - 只取第一个
+            var meaningList = currentWord.m.split('//');
+            var correctMeaning = meaningList[0].split('|')[0].trim();
+            
+            var allMeanings = [];
+            wordData.forEach(function(w) {
+                var mlist = w.m.split('//');
+                mlist.forEach(function(m) {
+                    var mclean = m.split('|')[0].trim();
+                    if (mclean !== correctMeaning && allMeanings.indexOf(mclean) < 0 && mclean) {
+                        allMeanings.push(mclean);
+                    }
+                });
+            });
+            shuffle(allMeanings);
+            var wrongOpts = allMeanings.slice(0, 3);
+            while (wrongOpts.length < 3) {
+                wrongOpts.push('(无)');
+            }
+            options = [correctMeaning].concat(wrongOpts);
+            shuffle(options);
+            
+            options.forEach(function(opt, i) {
+                var btn = document.createElement('div');
+                btn.className = 'option-box';
+                btn.textContent = (i + 1) + '. ' + opt;
+                btn.onclick = (function(idx) { return function() { checkAnswer(idx); }; })(i);
+                optsArea.appendChild(btn);
+            });
+        } else {
+            // 词性选项
+            var posList = currentWord.p.split('/');
+            var allPos = [];
+            wordData.forEach(function(w) {
+                w.p.split('/').forEach(function(p) {
+                    if (allPos.indexOf(p) < 0) allPos.push(p);
+                });
+            });
+            allPos = allPos.filter(function(p) { return posList.indexOf(p) < 0; });
+            shuffle(allPos);
+            var wrongOpts = allPos.slice(0, Math.max(0, 4 - posList.length));
+            options = posList.concat(wrongOpts);
+            shuffle(options);
+            
+            options.forEach(function(opt, i) {
+                var btn = document.createElement('div');
+                btn.className = 'option-box';
+                btn.id = 'opt_' + i;
+                btn.textContent = opt;
+                btn.onclick = (function(idx) { return function() { toggleOption(idx); }; })(i);
+                optsArea.appendChild(btn);
+            });
+            
+            var confirmBtn = document.createElement('button');
+            confirmBtn.textContent = '确认';
+            confirmBtn.style.marginTop = '10px';
+            confirmBtn.onclick = checkAnswerLevel5;
+            optsArea.appendChild(confirmBtn);
+        }
+    }
+    
+    function checkAnswer(idx) {
+        var meaningList = currentWord.m.split('//');
+        var correctMeaning = meaningList[0].split('|')[0].trim();
+        var correctIdx = options.indexOf(correctMeaning);
+        
+        if (idx === correctIdx) {
+            playSound(true);
+            var wordEl = document.getElementById('floating_word');
+            wordEl.style.transform = 'scale(2)';
+            wordEl.style.opacity = '0';
+            users[user].correct++;
+            // 答对后从错题库移除
+            var wrongList = users[user].wrongWords || [];
+            var idx = wrongList.indexOf(currentWord.w);
+            if (idx >= 0) { wrongList.splice(idx, 1); users[user].wrongWords = wrongList; }
+            save();
+            setTimeout(function() { currentQuestion++; loadQuestion(); }, 500);
+        } else {
+            playSound(false);
+            var meaningList = currentWord.m.split('//');
+            showMessage('错误！正确释义: ' + meaningList[0].split('|')[0].trim());
+            users[user].wrong++;
+            // 答错加入错题库
+            var wrongList = users[user].wrongWords || [];
+            if (wrongList.indexOf(currentWord.w) < 0) { wrongList.push(currentWord.w); users[user].wrongWords = wrongList; }
+            save();
+            setTimeout(function() { currentQuestion++; loadQuestion(); }, 1500);
+        }
+    }
+    
+    function toggleOption(idx) {
+        var i = selectedOptions.indexOf(idx);
+        if (i >= 0) { selectedOptions.splice(i, 1); }
+        else { selectedOptions.push(idx); }
+        updateOptionUI();
+    }
+    
+    function updateOptionUI() {
+        options.forEach(function(opt, i) {
+            var btn = document.getElementById('opt_' + i);
+            if (btn) {
+                if (selectedOptions.indexOf(i) >= 0) btn.classList.add('selected');
+                else btn.classList.remove('selected');
+            }
+        });
+    }
+    
+    function checkAnswerLevel5() {
+        var correctPos = currentWord.p.split('/').sort();
+        var selectedPos = selectedOptions.map(function(i) { return options[i]; }).sort();
+        
+        if (JSON.stringify(correctPos) === JSON.stringify(selectedPos)) {
+            playSound(true);
+            var wordEl = document.getElementById('floating_word');
+            wordEl.style.transform = 'scale(2)';
+            wordEl.style.opacity = '0';
+            users[user].correct++;
+            var wrongList = users[user].wrongWords || [];
+            var idx = wrongList.indexOf(currentWord.w);
+            if (idx >= 0) { wrongList.splice(idx, 1); users[user].wrongWords = wrongList; }
+            save();
+            setTimeout(function() { currentQuestion++; loadQuestion(); }, 500);
+        } else {
+            playSound(false);
+            showMessage('错误！正确词性: ' + currentWord.p);
+            users[user].wrong++;
+            var wrongList = users[user].wrongWords || [];
+            if (wrongList.indexOf(currentWord.w) < 0) { wrongList.push(currentWord.w); users[user].wrongWords = wrongList; }
+            save();
+            setTimeout(function() { currentQuestion++; loadQuestion(); }, 1500);
+        }
+    }
+    
+    function checkAnswer6() {
+        var input = document.getElementById('word_input').value.trim().toLowerCase();
+        var correct = currentWord.w.toLowerCase();
+        var wordEl = document.getElementById('floating_word');
+        
+        if (input === correct) {
+            playSound(true);
+            wordEl.textContent = currentWord.w;
+            wordEl.style.opacity = '1';
+            wordEl.style.transition = 'all 0.3s';
+            setTimeout(function() {
+                wordEl.style.transform = 'scale(2)';
+                wordEl.style.opacity = '0';
+            }, 500);
+            users[user].correct++;
+            var wrongList = users[user].wrongWords || [];
+            var idx = wrongList.indexOf(currentWord.w);
+            if (idx >= 0) { wrongList.splice(idx, 1); users[user].wrongWords = wrongList; }
+            save();
+            setTimeout(function() { currentQuestion++; loadQuestion(); }, 1000);
+        } else {
+            playSound(false);
+            wordEl.textContent = currentWord.w;
+            wordEl.style.opacity = '1';
+            showMessage('错误！正确单词: ' + currentWord.w + '<br>词性: ' + currentWord.p + '<br>释义: ' + currentWord.m.split('//')[0]);
+            users[user].wrong++;
+            var wrongList = users[user].wrongWords || [];
+            if (wrongList.indexOf(currentWord.w) < 0) { wrongList.push(currentWord.w); users[user].wrongWords = wrongList; }
+            save();
+            setTimeout(function() { currentQuestion++; loadQuestion(); }, 2000);
+        }
+    }
+    
+    function speakWord(word) {
+        try {
+            var u = new SpeechSynthesisUtterance(word);
+            u.lang = 'en-US';
+            u.rate = 0.7;
+            u.volume = 1.0;
+            speechSynthesis.speak(u);
+        } catch(e) {}
+    }
+    
+    function playSound(ok) {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            if (ok) {
+                var o = audioCtx.createOscillator();
+                var g = audioCtx.createGain();
+                o.connect(g);
+                g.connect(audioCtx.destination);
+                o.type = 'sine';
+                o.frequency.setValueAtTime(600, audioCtx.currentTime);
+                o.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                o.start();
+                o.stop(audioCtx.currentTime + 0.2);
+            } else {
+                var bufferSize = audioCtx.sampleRate * 0.5;
+                var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                var data = buffer.getChannelData(0);
+                for (var i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+                }
+                var noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                
+                var filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, audioCtx.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+                
+                var gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+            }
+        } catch(e) {}
+    }
+    
+    function showMessage(text) {
+        document.getElementById('message_text').innerHTML = text;
+        document.getElementById('message').classList.add('show');
+    }
+    
+    function closeMessage() {
+        document.getElementById('message').classList.remove('show');
+    }
+    
+    // 词库管理
+    function showUpload() {
+        document.getElementById('upload_modal').classList.add('show');
+        document.getElementById('word_count').textContent = rawWords.length;
+    }
+    
+    function closeUpload() {
+        document.getElementById('upload_modal').classList.remove('show');
+    }
+    
+    // 导入Excel词库（客户端解析）
+    function uploadExcel() {
+        var fileInput = document.getElementById('excel_file');
+        var file = fileInput.files[0];
+        if (!file) { alert('请选择Excel文件'); return; }
+        
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, {type: 'array'});
+                var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                var json = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                
+                var words = [];
+                var wordMap = {};
+                
+                for (var i = 1; i < json.length; i++) {
+                    var row = json[i];
+                    if (!row[0]) continue;
+                    var word = String(row[0]).trim();
+                    var pos = row[1] ? String(row[1]).trim() : '';
+                    var meaning = row[2] ? String(row[2]).trim() : '';
+                    
+                    if (!word) continue;
+                    if (!wordMap[word]) {
+                        wordMap[word] = {w: word, p: [], m: []};
+                    }
+                    if (pos && wordMap[word].p.indexOf(pos) < 0) wordMap[word].p.push(pos);
+                    if (meaning && wordMap[word].m.indexOf(meaning) < 0) wordMap[word].m.push(meaning);
+                }
+                
+                for (var key in wordMap) {
+                    var w = wordMap[key];
+                    words.push({w: w.w, p: w.p.join('/'), m: w.m.join('/')});
+                }
+                
+                if (words.length === 0) { alert('未找到有效单词数据'); return; }
+                
+                // 上传到服务器保存
+                fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(words)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    rawWords = words;
+                    wordData = words;
+                    document.getElementById('word_count').textContent = words.length;
+                    alert('导入成功！共 ' + words.length + ' 个单词');
+                    closeUpload();
+                })
+                .catch(function() {
+                    alert('导入成功！请刷新页面查看');
+                    location.reload();
+                });
+                
+            } catch(err) {
+                alert('解析失败: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function refreshWords() {
+        // 从服务器刷新词库
+        fetch('/api/words')
+            .then(function(r) { return r.json(); })
+            .then(function(words) {
+                rawWords = words;
+                wordData = words;
+                document.getElementById('word_count').textContent = words.length;
+                alert('词库已刷新！当前 ' + words.length + ' 个单词');
+                closeUpload();
+            })
+            .catch(function(e) {
+                // 失败则提示用户刷新页面
+                alert('请刷新整个页面（F5）来加载最新词库');
+                closeUpload();
+            });
+    }
+    
+    function closeDownload() {
+        document.getElementById('download_modal').classList.remove('show');
+    }
+    
+    function downloadTemplate() {
+        alert('请手动打开 Excel 模板文件添加单词');
+    }
+    
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+    
+    document.getElementById('word_input').onkeydown = function(e) {
+        if (e.key === 'Enter') checkAnswer6();
+    };
+    
+    document.onkeydown = function(e) {
+        if (!user) return;
+        if (e.key >= '1' && e.key <= '4' && document.getElementById('game').classList.contains('active')) {
+            if (currentLevel < 5) checkAnswer(parseInt(e.key) - 1);
+        }
+    };
+    
+    init();
+    </script>
+</body>
+</html>
