@@ -67,6 +67,22 @@ def get_words():
     words = load_words()
     return jsonify(words)
 
+# 管理员查看所有用户
+@app.route('/api/admin/users')
+def admin_users():
+    users = load_users()
+    # 返回脱敏后的用户数据（不包含密码）
+    safe_users = {}
+    for uid, data in users.items():
+        safe_users[uid] = {
+            'username': data.get('username', ''),
+            'level': data.get('level', 1),
+            'correct': data.get('correct', 0),
+            'wrong': data.get('wrong', 0),
+            'wrongWords': data.get('wrongWords', [])
+        }
+    return jsonify(safe_users)
+
 @app.route('/api/users', methods=['GET', 'POST', 'PUT'])
 def api_users():
     users = load_users()
