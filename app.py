@@ -139,6 +139,28 @@ def index():
 def word_file():
     return send_file(WORD_FILE)
 
+# 调试：检查用户文件
+@app.route('/api/debug')
+def debug():
+    import os
+    return jsonify({
+        'user_file_exists': os.path.exists(USER_FILE),
+        'user_file_path': USER_FILE,
+        'cwd': os.getcwd(),
+        'files': os.listdir('.')
+    })
+
+# 调试
+@app.route('/api/debug')
+def debug():
+    import os
+    return jsonify({
+        'user_file_exists': os.path.exists(USER_FILE),
+        'user_file_path': USER_FILE,
+        'cwd': os.getcwd(),
+        'files': os.listdir('.')
+    })
+
 if __name__ == '__main__':
     words = load_words()
     port = int(os.environ.get('PORT', 8000))
