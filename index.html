@@ -287,8 +287,9 @@
     
     function startLevel(lvl) {
         var d = users[user];
-        if (lvl > 1 && d.level < lvl - 1) { alert('请先通关前一关'); return; }
-        if (lvl === 6 && d.level < 5) { alert('请先通关关卡5'); return; }
+        // 移除关卡锁定，玩家可以选择任意关卡
+        // if (lvl > 1 && d.level < lvl - 1) { alert('请先通关前一关'); return; }
+        // if (lvl === 6 && d.level < 5) { alert('请先通关关卡5'); return; }
         
         currentLevel = lvl;
         currentQuestion = 0;
