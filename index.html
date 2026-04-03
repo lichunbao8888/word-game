@@ -80,6 +80,7 @@
         
         <div id="game" class="screen">
             <div class="top-bar">
+                <button onclick="exitGame()" style="padding:5px 10px;font-size:12px;background:#D9534F">返回</button>
                 <span id="level_display">关卡1</span>
                 <span id="player_display">玩家:</span>
                 <span id="question_display">第1题</span>
@@ -204,6 +205,12 @@
                     wrongWords: users[userId].wrongWords
                 })
             });
+        }
+    }
+    
+    function exitGame() {
+        if (confirm('确定要退出当前游戏吗？')) {
+            showMenu();
         }
     }
     
